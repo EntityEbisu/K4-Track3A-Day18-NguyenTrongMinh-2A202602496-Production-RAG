@@ -19,14 +19,44 @@ Xem **ASSIGNMENT.md** để biết chi tiết từng module và timeline.
 
 | Dependency | Bắt buộc? | Dùng cho |
 |-----------|-----------|----------|
-| Docker (Qdrant) | ✅ Có | M2 Dense Search |
+| Docker (Qdrant) | ⚠️ Tùy chọn * | M2 Dense Search |
 | Python 3.11+ | ✅ Có | Tất cả modules (RAGAS cần 3.11+ cho asyncio) |
-| `OPENAI_API_KEY` | ⚠️ M4+M5 | RAGAS eval (M4), Enrichment LLM (M5) |
+| `OPENAI_API_KEY` | ✅ Có | RAGAS eval (M4), Enrichment LLM (M5), sinh câu trả lời |
+| LM Studio (OpenAI-compatible server) | ⚠️ Tùy chọn * | Dùng thay OpenAI API khi chạy offline |
 
-**Pre-download models** (tránh timeout trong lab):
+`*` — hai dòng này được học viên sửa lại; bản gốc của đề bài ghi Docker là **bắt buộc**
+(`✅`) và `OPENAI_API_KEY` là **không bắt buộc** (`⚠️`). Xem ghi chú bên dưới.
+
+### Ghi chú về môi trường chạy thực tế
+
+> **Phần này do học viên bổ sung, KHÔNG phải nội dung gốc của đề bài.**
+> README gốc yêu cầu chạy Docker cho Qdrant và dùng API OpenAI trả phí (`OPENAI_API_KEY`).
+> Bài của tôi chạy hoàn toàn offline trên máy cá nhân với LM Studio, nên tôi ghi lại
+> những điểm khác biệt ở đây để người chấm không bất ngờ. Toàn bộ 5 module vẫn giữ nguyên
+> logic và cấu trúc của đề bài; các khác biệt chỉ nằm ở *nguồn cung cấp dịch vụ*.
+>
+> — Nguyễn Trọng Minh (02496), K4-Track3A, 05/10/2026
+
+Bài này được chạy với **LM Studio** thay cho API OpenAI có trả phí, và **Qdrant in-memory**
+thay cho Docker. Cả hai đều không làm thay đổi logic của từng module:
+
+- **LLM qua LM Studio.** Đặt `OPENAI_API_KEY` (key của LM Studio) và `OPENAI_API_BASE`
+  trong `.env`. Cần **cả hai** biến: `openai` SDK đọc `OPENAI_BASE_URL`, còn
+  `langchain-openai` 0.1.x (mà RAGAS dùng bên trong) **chỉ** đọc `OPENAI_API_BASE`.
+  Thiếu biến thứ hai, RAGAS sẽ gọi nhầm API OpenAI thật và fail với
+  `OpenAIAuthenticationError`. RAGAS cũng cần override LLM + embedding vì mặc định của
+  nó là `gpt-4o-mini` / `text-embedding-ada-002` (không có trong LM Studio).
+- **RAGAS chạy tuần tự.** `RunConfig(max_workers=1)` — LM Studio phục vụ lần lượt từng
+  request trên 1 GPU, còn mặc định của RAGAS là 16 worker → mọi call đều timeout và trả
+  về `NaN`.
+- **Embedding qua LM Studio.** M2 dense search gọi `/v1/embeddings` thay vì tải
+  `BAAI/bge-m3` qua `sentence_transformers` (model đã nạp sẵn trên GPU, tiết kiệm ~2.3 GB).
+- **Qdrant in-memory.** `DenseSearch` tự fallback sang `QdrantClient(":memory:")` khi
+  không kết nối được Docker. Corpus chỉ ~26 KB nên không cần lưu lâu dài.
+
+**Pre-download models** (chỉ cần model reranker, để tránh timeout trong lab):
 ```bash
 python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
-python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3')"
 python -c "from sentence_transformers import CrossEncoder; CrossEncoder('BAAI/bge-reranker-v2-m3')"
 ```
 
