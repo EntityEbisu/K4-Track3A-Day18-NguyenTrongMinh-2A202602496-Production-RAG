@@ -7,6 +7,12 @@ load_dotenv()
 
 # --- API Keys ---
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+# LM Studio (OpenAI-compatible server). BOTH vars are required:
+#   - the openai SDK reads OPENAI_BASE_URL
+#   - langchain-openai 0.1.x (used internally by RAGAS) reads OPENAI_API_BASE only
+# Missing either one makes RAGAS target the real OpenAI API and fail auth.
+OPENAI_API_BASE = os.getenv("OPENAI_API_BASE", "")
+LLM_MODEL = os.getenv("LLM_MODEL", "ternary-bonsai-8b")
 
 # --- Qdrant ---
 QDRANT_HOST = "localhost"
@@ -15,8 +21,13 @@ COLLECTION_NAME = "lab18_production"
 NAIVE_COLLECTION = "lab18_naive"
 
 # --- Embedding ---
+# Dense search (M2) embeds locally via sentence-transformers — this is a
+# HuggingFace model id, NOT an LM Studio model id.
 EMBEDDING_MODEL = "BAAI/bge-m3"
 EMBEDDING_DIM = 1024
+# RAGAS (M4) scores through the LM Studio /v1/embeddings endpoint instead,
+# which serves a different model id. Kept separate on purpose.
+RAGAS_EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-bge-m3")
 
 # --- Chunking ---
 HIERARCHICAL_PARENT_SIZE = 2048
