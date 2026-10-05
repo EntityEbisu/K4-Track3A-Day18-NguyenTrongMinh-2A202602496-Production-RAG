@@ -3,6 +3,7 @@ from __future__ import annotations
 """Module 4: RAGAS Evaluation — 4 metrics + failure analysis."""
 
 import os, sys, json
+from math import isfinite
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 if hasattr(sys.stderr, "reconfigure"):
@@ -29,6 +30,20 @@ def load_test_set(path: str = TEST_SET_PATH) -> list[dict]:
     """Load test set from JSON. (Đã implement sẵn)"""
     with open(path, encoding="utf-8") as f:
         return json.load(f)
+
+
+def _finite(value) -> float:
+    """Chuyen metric cua RAGAS thanh float, NaN/inf -> 0.0.
+
+    RAGAS tra NaN cho metric khong cham duoc. `nan or 0.0` van ra nan (NaN la
+    truthy), nen phai kiem tra isfinite truoc — neu khong mot dong that bai
+    se lam bang 0.0 cho ca 20 cau hoi.
+    """
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return number if isfinite(number) else 0.0
 
 
 def _ragas_llm_and_embeddings():
@@ -67,7 +82,7 @@ def evaluate_ragas(questions: list[str], answers: list[str],
     # để một câu hỏi hỏng không làm sập cả batch.
     try:
         from datasets import Dataset
-        from ragas import evaluate
+        from ragas import RunConfig, evaluate
         from ragas.metrics import (answer_relevancy, context_precision,
                                     context_recall, faithfulness)
 
@@ -76,20 +91,25 @@ def evaluate_ragas(questions: list[str], answers: list[str],
             "contexts": contexts, "ground_truth": ground_truths,
         })
         llm, embeddings = _ragas_llm_and_embeddings()
+        # max_workers=1: LM Studio phuc vu tu 1 request mot lu tren GPU nay, con
+        # RunConfig mac dinh cua RAGAS la 16 → moi call deu timeout → toan bo
+        # metric tra ve NaN. Chay serial de lay so that.
+        run_config = RunConfig(max_workers=1, timeout=300, max_retries=3)
         result = evaluate(dataset,
                           metrics=[faithfulness, answer_relevancy,
                                    context_precision, context_recall],
-                          llm=llm, embeddings=embeddings, raise_exceptions=False)
+                          llm=llm, embeddings=embeddings,
+                          run_config=run_config, raise_exceptions=False)
 
         df = result.to_pandas()
         per_question = [
             EvalResult(
                 question=row["question"], answer=row["answer"],
                 contexts=row["contexts"], ground_truth=row["ground_truth"],
-                faithfulness=float(row.get("faithfulness") or 0.0),
-                answer_relevancy=float(row.get("answer_relevancy") or 0.0),
-                context_precision=float(row.get("context_precision") or 0.0),
-                context_recall=float(row.get("context_recall") or 0.0),
+                faithfulness=_finite(row.get("faithfulness")),
+                answer_relevancy=_finite(row.get("answer_relevancy")),
+                context_precision=_finite(row.get("context_precision")),
+                context_recall=_finite(row.get("context_recall")),
             )
             for _, row in df.iterrows()
         ]
