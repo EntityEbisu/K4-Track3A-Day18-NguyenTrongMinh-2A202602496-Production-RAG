@@ -1,0 +1,81 @@
+{
+  "aggregate": {
+    "faithfulness": 0.5083,
+    "answer_relevancy": 0.7107,
+    "context_precision": 0.9125,
+    "context_recall": 0.8333
+  },
+  "num_questions": 20,
+  "failures": [
+    {
+      "question": "Nhân viên được tài trợ khóa học 25 triệu, nghỉ việc sau 8 tháng hoàn thành khóa học. Phải hoàn trả bao nhiêu?",
+      "worst_metric": "faithfulness",
+      "score": 0.4215,
+      "diagnosis": "LLM đang hallucinate — câu trả lời có thông tin không có trong context",
+      "suggested_fix": "Siết prompt, hạ temperature xuống 0, ép trích dẫn nguồn"
+    },
+    {
+      "question": "Nhân viên tạm ứng 15 triệu, sau 20 ngày mới thanh toán. Bị phạt bao nhiêu?",
+      "worst_metric": "faithfulness",
+      "score": 0.4907,
+      "diagnosis": "LLM đang hallucinate — câu trả lời có thông tin không có trong context",
+      "suggested_fix": "Siết prompt, hạ temperature xuống 0, ép trích dẫn nguồn"
+    },
+    {
+      "question": "Nghỉ phép không lương 20 ngày cần ai phê duyệt?",
+      "worst_metric": "faithfulness",
+      "score": 0.5181,
+      "diagnosis": "LLM đang hallucinate — câu trả lời có thông tin không có trong context",
+      "suggested_fix": "Siết prompt, hạ temperature xuống 0, ép trích dẫn nguồn"
+    },
+    {
+      "question": "Nhân viên thử việc có được hưởng bảo hiểm sức khỏe PVI không?",
+      "worst_metric": "faithfulness",
+      "score": 0.5211,
+      "diagnosis": "LLM đang hallucinate — câu trả lời có thông tin không có trong context",
+      "suggested_fix": "Siết prompt, hạ temperature xuống 0, ép trích dẫn nguồn"
+    },
+    {
+      "question": "Lương thử việc của nhân viên Junior mức cao nhất là bao nhiêu?",
+      "worst_metric": "faithfulness",
+      "score": 0.5566,
+      "diagnosis": "LLM đang hallucinate — câu trả lời có thông tin không có trong context",
+      "suggested_fix": "Siết prompt, hạ temperature xuống 0, ép trích dẫn nguồn"
+    },
+    {
+      "question": "Mentor và buddy của nhân viên mới có thể là cùng một người không? Quản lý trực tiếp có thể làm mentor không?",
+      "worst_metric": "context_recall",
+      "score": 0.6279,
+      "diagnosis": "Thiếu chunk chứa đáp án trong context đã truy xuất",
+      "suggested_fix": "Cải thiện chunking, thêm BM25 vào hybrid, nới top_k khi truy xuất"
+    },
+    {
+      "question": "Một nhân viên Senior có 9 năm thâm niên được nghỉ bao nhiêu ngày phép năm và lương trong khoảng nào?",
+      "worst_metric": "faithfulness",
+      "score": 0.6495,
+      "diagnosis": "LLM đang hallucinate — câu trả lời có thông tin không có trong context",
+      "suggested_fix": "Siết prompt, hạ temperature xuống 0, ép trích dẫn nguồn"
+    },
+    {
+      "question": "Thâm niên bao nhiêu năm thì được cộng thêm ngày phép?",
+      "worst_metric": "faithfulness",
+      "score": 0.6597,
+      "diagnosis": "LLM đang hallucinate — câu trả lời có thông tin không có trong context",
+      "suggested_fix": "Siết prompt, hạ temperature xuống 0, ép trích dẫn nguồn"
+    },
+    {
+      "question": "Nhân viên được nghỉ bao nhiêu ngày phép năm?",
+      "worst_metric": "faithfulness",
+      "score": 0.6866,
+      "diagnosis": "LLM đang hallucinate — câu trả lời có thông tin không có trong context",
+      "suggested_fix": "Siết prompt, hạ temperature xuống 0, ép trích dẫn nguồn"
+    },
+    {
+      "question": "Thông tin lương thuộc cấp độ phân loại dữ liệu nào?",
+      "worst_metric": "faithfulness",
+      "score": 0.6941,
+      "diagnosis": "LLM đang hallucinate — câu trả lời có thông tin không có trong context",
+      "suggested_fix": "Siết prompt, hạ temperature xuống 0, ép trích dẫn nguồn"
+    }
+  ]
+}
