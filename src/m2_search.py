@@ -11,7 +11,8 @@ from dataclasses import dataclass
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import (QDRANT_HOST, QDRANT_PORT, COLLECTION_NAME, EMBEDDING_MODEL,
-                    EMBEDDING_DIM, BM25_TOP_K, DENSE_TOP_K, HYBRID_TOP_K)
+                    EMBEDDING_DIM, BM25_TOP_K, DENSE_TOP_K, HYBRID_TOP_K,
+                    OPENAI_API_KEY)
 
 
 @dataclass
@@ -73,20 +74,63 @@ class BM25Search:
         return results
 
 
+class _LMStudioEmbedder:
+    """Bọc LM Studio OpenAI-compatible /v1/embeddings thành API .encode() giống
+    SentenceTransformer, để DenseSearch không phải đổi logic gọi."""
+
+    def __init__(self, batch_size: int = 64):
+        self.batch_size = batch_size
+
+    def encode(self, texts: str | list[str], **_ignored):
+        from numpy import array, linalg
+
+        if isinstance(texts, str):
+            texts = [texts]
+
+        from openai import OpenAI
+        client = OpenAI(timeout=120.0, max_retries=2)
+
+        vectors = []
+        for start in range(0, len(texts), self.batch_size):
+            batch = texts[start:start + self.batch_size]
+            resp = client.embeddings.create(model=EMBEDDING_MODEL, input=batch)
+            # Sắp xếp theo index để chắc chắn khớp thứ tự với batch input.
+            vectors.extend(item.embedding for item in sorted(resp.data, key=lambda x: x.index))
+
+        arr = array(vectors, dtype="float32")
+        # LM Studio đã trả vector L2-normalised (norm = 1.0) nhưng normalize lại cho
+        # chắc chắn, để cosine distance của Qdrant luôn đúng.
+        norms = linalg.norm(arr, axis=1, keepdims=True)
+        return arr / (norms + 1e-9)
+
+
 class DenseSearch:
     def __init__(self):
         from qdrant_client import QdrantClient
+        # Docker thuong khong chay trong lab → dùng Qdrant in-memory. Phai verify
+        # collection list thuc su chay duoc (khong phai chi tao client) truoc khi giu
+        # remote client, neu khong moi nham sang :memory:.
+        self.client = QdrantClient(":memory:")
         try:
-            self.client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, timeout=2)
-            self.client.get_collections()
+            remote = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, timeout=2,
+                                  check_compatibility=False)
+            remote.get_collections()
+            self.client = remote
+            self.remote = True
         except Exception:
-            self.client = QdrantClient(":memory:")
+            self.remote = False
         self._encoder = None
 
     def _get_encoder(self):
+        """Trả về object có .encode(texts) -> numpy array (L2-normalised, 1024-dim).
+
+        Dùng LM Studio `/v1/embeddings` thay vì SentenceTransformer("BAAI/bge-m3"):
+        cùng model bge-m3, nhưng đã được LM Studio nạp sẵn trên GPU nên không cần
+        tải thêm ~2.3 GB. LM Studio phục vụ bản Q4_K_M GGUF nên vector khác
+        bản full-precision một chút — không ảnh hưởng thứ hạng đáng kể.
+        """
         if self._encoder is None:
-            from sentence_transformers import SentenceTransformer
-            self._encoder = SentenceTransformer(EMBEDDING_MODEL)
+            self._encoder = _LMStudioEmbedder()
         return self._encoder
 
     def index(self, chunks: list[dict], collection: str = COLLECTION_NAME) -> None:
@@ -98,13 +142,10 @@ class DenseSearch:
             self.client.delete_collection(collection)
         self.client.create_collection(
             collection_name=collection,
-            vectors_config=VectorParams(size=EMBEDDING_DIM, distance=Distance.COSINE),
+            vectors_config=VectorParams(size=EMBEDDING_DIM, distance=Distance.DOT),
         )
 
-        vectors = self._get_encoder().encode(
-            [c["text"] for c in chunks], show_progress_bar=True,
-            normalize_embeddings=True,
-        )
+        vectors = self._get_encoder().encode([c["text"] for c in chunks])
         self.client.upsert(collection, points=[
             PointStruct(
                 id=i,
@@ -119,12 +160,18 @@ class DenseSearch:
         if not self.client.collection_exists(collection):
             return []
 
-        query_vector = self._get_encoder().encode(
-            query, normalize_embeddings=True).tolist()
-        response = self.client.query_points(
-            collection=collection, query=query_vector, limit=top_k)
+        from qdrant_client import models
 
-        # ⚠️ LƯU Ý: qdrant-client >= 2.0 dùng query_points(), KHÔNG phải search().
+        query_vector = self._get_encoder().encode(query)[0].tolist()
+        # NOTE 1/2/3 for qdrant-client 1.19 with QdrantClient(":memory:"):
+        #   1) collection_name must be positional — collection= raises TypeError.
+        #   2) a plain list is read as a 2-D array -> "Multivector  is not found";
+        #      wrap it in models.NearestQuery(nearest=...).
+        #   3) vectors are L2-normalised, so Distance.DOT == cosine.
+        response = self.client.query_points(
+            collection, query=models.NearestQuery(nearest=query_vector),
+            limit=top_k)
+
         return [
             SearchResult(
                 text=pt.payload["text"],

@@ -21,13 +21,13 @@ COLLECTION_NAME = "lab18_production"
 NAIVE_COLLECTION = "lab18_naive"
 
 # --- Embedding ---
-# Dense search (M2) embeds locally via sentence-transformers — this is a
-# HuggingFace model id, NOT an LM Studio model id.
-EMBEDDING_MODEL = "BAAI/bge-m3"
+# Dense search (M2) va RAGAS (M4) deu goi LM Studio /v1/embeddings, nen cung mot
+# model id. Mac dinh la id ma LM Studio phuc vu; dat EMBEDDING_MODEL trong .env
+# de tro sang model khac.
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-bge-m3")
 EMBEDDING_DIM = 1024
-# RAGAS (M4) scores through the LM Studio /v1/embeddings endpoint instead,
-# which serves a different model id. Kept separate on purpose.
-RAGAS_EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-bge-m3")
+# Giu alias cho RAGAS de doc ma doc lap
+RAGAS_EMBEDDING_MODEL = EMBEDDING_MODEL
 
 # --- Chunking ---
 HIERARCHICAL_PARENT_SIZE = 2048
