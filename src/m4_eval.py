@@ -34,10 +34,15 @@ def load_test_set(path: str = TEST_SET_PATH) -> list[dict]:
 def _ragas_llm_and_embeddings():
     """Build RAGAS LLM/embedding wrappers pointed at LM Studio (OpenAI-compatible).
 
-    ⚠️ LƯU Ý: không dùng llm_factory()/embedding_factory() mặc định của RAGAS —
-    chúng hard-code `gpt-4o-mini` và `text-embedding-ada-002`, hai model mà
-    LM Studio không phục vụ. ChatOpenAI/OpenAIEmbeddings tự đọc OPENAI_API_BASE
-    từ .env, nên chúng trỏ về http://127.0.0.1:1234/v1.
+    LUY Y 1: khong dung llm_factory()/embedding_factory() mac dinh cua RAGAS --
+    chung hard-code `gpt-4o-mini` va `text-embedding-ada-002`, hai model ma LM Studio
+    khong phuc vu. ChatOpenAI/OpenAIEmbeddings tu doc OPENAI_API_BASE tu .env,
+    nen chung tro ve http://127.0.0.1:1234/v1.
+
+    LUY Y 2: check_embedding_ctx_length=False la BAT BUOC. Mac dinh True khien
+    langchain tokenize roi gui mang int len /v1/embeddings; LM Studio tra 400
+    "'input' field must be a string or an array of strings", khien
+    answer_relevancy = nan.
     """
     from langchain_openai import ChatOpenAI, OpenAIEmbeddings
     from ragas.embeddings import LangchainEmbeddingsWrapper
@@ -47,7 +52,8 @@ def _ragas_llm_and_embeddings():
 
     return (
         LangchainLLMWrapper(ChatOpenAI(model=LLM_MODEL, temperature=0, max_retries=3)),
-        LangchainEmbeddingsWrapper(OpenAIEmbeddings(model=RAGAS_EMBEDDING_MODEL)),
+        LangchainEmbeddingsWrapper(OpenAIEmbeddings(
+            model=RAGAS_EMBEDDING_MODEL, check_embedding_ctx_length=False)),
     )
 
 
